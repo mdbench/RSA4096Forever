@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RSA 4096 Forever | Home</title>
+    <style>
+        :root { --glow: #00f2fe; --neon: #4facfe; --matrix: #00ff41; }
+        body { background: #000; color: #fff; font-family: 'Consolas', monospace; margin: 0; display: flex; height: 100vh; }
+        
+        /* Sidebar Registry */
+        #registry {
+            width: 280px;
+            background: #050505;
+            border-right: 1px solid var(--neon);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        .module-btn {
+            background: transparent;
+            border: 1px solid #222;
+            color: #666;
+            padding: 15px;
+            margin-bottom: 8px;
+            text-align: left;
+            cursor: pointer;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            transition: 0.3s;
+        }
+        .module-btn:hover { border-color: var(--neon); color: var(--neon); }
+        .module-btn.active { border-color: var(--matrix); color: var(--matrix); background: rgba(0, 255, 65, 0.05); }
+
+        /* Content Area */
+        #matrix-display { flex-grow: 1; display: flex; flex-direction: column; }
+        header { padding: 20px; border-bottom: 1px solid #111; display: flex; justify-content: space-between; }
+        .title { letter-spacing: 4px; color: var(--neon); font-weight: bold; }
+        
+        #display-frame { flex-grow: 1; border: none; background: #000; }
+        .loading-overlay { color: var(--matrix); font-size: 0.8rem; padding: 20px; }
+    </style>
+</head>
+<body>
+
+    <nav id="registry">
+        <h2 style="color: var(--matrix); font-size: 0.8rem; letter-spacing: 2px;">MODULE_REGISTRY</h2>
+        <div id="button-list">
+            <div class="loading-overlay">FETCHING_MANIFEST...</div>
+        </div>
+    </nav>
+
+    <main id="matrix-display">
+        <header>
+            <div class="title">RSA 4096 FOREVER</div>
+            <div id="node-status" style="font-size: 0.7rem; color: #444;">NODE: DISCONNECTED</div>
+        </header>
+        <iframe id="display-frame"></iframe>
+    </main>
+
+    <script>
+        const frame = document.getElementById('display-frame');
+        const status = document.getElementById('node-status');
+        const btnList = document.getElementById('button-list');
+
+        // Initialize Admin Panel via JSON Fetch
+        async function initDashboard() {
+            try {
+                const response = await fetch('site-catalog.json');
+                const data = await response.json();
+                
+                btnList.innerHTML = ''; // Clear loading text
+                
+                data.modules.forEach(mod => {
+                    const btn = document.createElement('button');
+                    btn.className = 'module-btn';
+                    btn.innerText = mod.name;
+                    btn.onclick = () => loadTarget(btn, mod.path);
+                    btnList.appendChild(btn);
+                });
+
+                // Auto-load primary module
+                if (btnList.firstChild) btnList.firstChild.click();
+                
+            } catch (err) {
+                btnList.innerHTML = '<div style="color:red">ERR: MANIFEST_NOT_FOUND</div>';
+                console.error("Critical: Manifest fetch failed.", err);
+            }
+        }
+
+        async function loadTarget(element, path) {
+            // UI Feedback
+            document.querySelectorAll('.module-btn').forEach(b => b.classList.remove('active'));
+            element.classList.add('active');
+            status.innerText = `NODE: ${path.toUpperCase()}`;
+
+            // Execute Fetch for HTML injection
+            try {
+                const res = await fetch(path);
+                if (!res.ok) throw new Error("HTTP_ERROR");
+                
+                const html = await res.text();
+                
+                // Injecting source into the iframe
+                const doc = frame.contentWindow.document;
+                doc.open();
+                doc.write(html);
+                doc.close();
+                
+                console.log(`FETCH_SUCCESS: Sector ${path} synchronized.`);
+            } catch (e) {
+                console.error("IO_ERROR:", e);
+                status.innerText = "NODE: FETCH_FAILED";
+            }
+        }
+
+        window.onload = initDashboard;
+    </script>
+</body>
+</html>

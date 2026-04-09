@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RSA4096Forever | Prometheus Protocol</title>
+    <style>
+        :root { --glow: #00f2fe; --neon: #4facfe; --matrix: #00ff41; --prometheus: #ff8c00; }
+        body { background: #000; color: #fff; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background: radial-gradient(circle, #001a1a 0%, #000 100%); }
+        .container { width: 90%; max-width: 850px; padding: 40px; border-radius: 20px; background: rgba(0, 0, 0, 0.95); border: 2px solid var(--neon); box-shadow: 0 0 30px rgba(79, 172, 254, 0.2); }
+        h1 { background: linear-gradient(to right, var(--neon), var(--matrix)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; letter-spacing: 5px; margin: 0;}
+        .prometheus-text { color: var(--prometheus); font-weight: bold; text-shadow: 0 0 5px var(--prometheus); }
+        .section-label { color: var(--neon); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; margin-top: 25px; display: block; border-bottom: 1px solid #222; padding-bottom: 5px;}
+        .upload-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .upload-box { font-size: 0.7rem; color: #888; display: flex; flex-direction: column; }
+        button { flex: 1; padding: 12px; border: 1px solid var(--neon); background: transparent; color: var(--neon); cursor: pointer; border-radius: 5px; font-weight: bold; transition: 0.3s; margin: 5px; }
+        button:hover { background: var(--neon); color: #000; box-shadow: 0 0 15px var(--neon); }
+        button.prometheus-btn { border-color: var(--prometheus); color: var(--prometheus); }
+        button.prometheus-btn:hover { background: var(--prometheus); color: #000; box-shadow: 0 0 15px var(--prometheus); }
+        #log { background: #020202; border: 1px solid #111; height: 180px; padding: 15px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 11px; color: var(--matrix); margin-top: 20px; border-radius: 5px; line-height: 1.4; }
+    </style>
+</head>
+<body>
+    <div class="bg"></div>
+    <div class="container">
+        <h1>RSA-4096 Encryptor</h1>
+        <p style="text-align: center; color: #666; font-size: 0.7rem;">V1.0.0: Prometheus Protocol</p>
+        
+        <span class="section-label">Identity Management</span>
+        <div style="display: flex;">
+            <button onclick="initProtocol()">Forge Matrix</button>
+            <button class="prometheus-btn" onclick="exportKeys()">Export <span class="prometheus-text">Prometheus</span> Triad</button>
+        </div>
+
+        <div class="upload-row">
+            <div class="upload-box">Alpha Key<input type="file" id="loadA"></div>
+            <div class="upload-box">Omega Key<input type="file" id="loadO"></div>
+            <div class="upload-box"><span class="prometheus-text">Prometheus</span> Key<input type="file" id="loadP"></div>
+        </div>
+        <button onclick="importKeys()" style="width: 100%; margin: 10px 0;">Sync Matrix State</button>
+        
+        <span class="section-label">Encryption Operations</span>
+        <input type="file" id="fileInput" style="margin-top:15px; color: #888; display: block;">
+        <div style="display: flex; margin-top: 10px;">
+            <button onclick="encryptFile()" style="background: var(--matrix); color: black; border: none;">Lock</button>
+            <button class="prometheus-btn" onclick="decryptFile()">Decrypt</button>
+        </div>
+
+        <div id="log">SYSTEM_READY: Prometheus Protocol ACTIVE.</div>
+    </div>
+
+    <script>
+        let kA = {}, kO = {}, kP = {}; 
+        const logger = (m) => { 
+            const l = document.getElementById('log'); 
+            l.innerHTML += `[${new Date().toLocaleTimeString()}] > ${m}<br>`; 
+            l.scrollTop = l.scrollHeight; 
+        };
+
+        function d2xy(n, d) {
+            let x = 0, y = 0, t = d;
+            for (let s = 1; s < n; s *= 2) {
+                let rx = 1 & (t / 2); let ry = 1 & (t ^ rx);
+                [x, y] = rot(s, x, y, rx, ry);
+                x += s * rx; y += s * ry; t /= 4;
+            }
+            return [x, y];
+        }
+
+        function rot(n, x, y, rx, ry) {
+            if (ry === 0) {
+                if (rx === 1) { x = n - 1 - x; y = n - 1 - y; }
+                return [y, x];
+            }
+            return [x, y];
+        }
+
+        // Mathematically fixed to 16x16 (256 bytes) to maintain bit parity with the XOR stage
+        function applyHilbert(buffer, forward = true) {
+            const side = 16;
+            const planeSize = 256;
+            let output = new Uint8Array(planeSize);
+            for (let i = 0; i < planeSize; i++) {
+                let [x, y] = d2xy(side, i);
+                let spatialIdx = (y * side + x);
+                if (forward) {
+                    output[spatialIdx] = buffer[i];
+                } else {
+                    output[i] = buffer[spatialIdx];
+                }
+            }
+            return output;
+        }
+
+        async function initProtocol() {
+            logger("GEN: Initiating RSA-4096 Parity-Checked Keys...");
+            const cfg = { name: "RSA-OAEP", modulusLength: 4096, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" };
+            kA = await window.crypto.subtle.generateKey(cfg, true, ["decrypt"]);
+            kO = await window.crypto.subtle.generateKey(cfg, true, ["decrypt"]);
+            kP = await window.crypto.subtle.generateKey(cfg, true, ["encrypt", "decrypt"]);
+            logger("STATUS: Fractal Matrix Active.");
+        }
+
+        async function exportKeys() {
+            if(!kP.privateKey) return logger("ERR: Keys uninitialized.");
+            const save = async (k, n) => {
+                const b = await window.crypto.subtle.exportKey("pkcs8", k.privateKey);
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([b])); a.download = `${n}.key`; a.click();
+            };
+            logger("IO: Exporting Triad...");
+            await save(kA, "Alpha"); await new Promise(r => setTimeout(r, 600));
+            await save(kO, "Omega"); await new Promise(r => setTimeout(r, 600));
+            await save(kP, "Prometheus");
+        }
+
+        async function importKeys() {
+            const cfg = { name: "RSA-OAEP", hash: "SHA-256" };
+            try {
+                kA.privateKey = await window.crypto.subtle.importKey("pkcs8", await document.getElementById('loadA').files[0].arrayBuffer(), cfg, true, ["decrypt"]);
+                kO.privateKey = await window.crypto.subtle.importKey("pkcs8", await document.getElementById('loadO').files[0].arrayBuffer(), cfg, true, ["decrypt"]);
+                kP.privateKey = await window.crypto.subtle.importKey("pkcs8", await document.getElementById('loadP').files[0].arrayBuffer(), cfg, true, ["decrypt"]);
+                logger("STATUS: Matrix State Synchronized.");
+            } catch(e) { logger("ERR: Import failed."); }
+        }
+
+        async function encryptFile() {
+            const file = document.getElementById('fileInput').files[0];
+            if(!file || !kP.publicKey) return logger("ERR: System uninitialized.");
+            const data = new Uint8Array(await file.arrayBuffer());
+            let offset = 0, results = [], prevP = new Uint8Array(256).fill(0x13);
+
+            logger("OP: START_ENCRYPT_PIPELINE");
+            while(offset < data.length) {
+                let chunk = new Uint8Array(256);
+                chunk.set(data.slice(offset, offset + 256));
+
+                // Synchronized 256-byte XOR
+                let mingled = new Uint8Array(256);
+                for(let i=0; i < 256; i++) {
+                    mingled[i] = chunk[i] ^ prevP[i];
+                }
+
+                // Synchronized 256-byte Hilbert
+                let fractal = applyHilbert(mingled, true);
+
+                // RSA Wrap (4096-bit can comfortably encrypt 256 bytes)
+                const encrypted = await window.crypto.subtle.encrypt({name: "RSA-OAEP"}, kP.publicKey, fractal);
+                const bE = new Uint8Array(encrypted);
+                results.push(bE);
+
+                prevP.set(bE.slice(0, 256));
+                offset += 256;
+                if(Math.floor(offset/256) % 100 === 0) logger(`PULSE: Sector ${Math.floor(offset/256)} locked.`);
+            }
+            saveAs(new Blob(results), "fractal.vault");
+            logger("IO: Encryption Complete.");
+        }
+
+        async function decryptFile() {
+            const file = document.getElementById('fileInput').files[0];
+            if(!file || !kP.privateKey) return logger("ERR: Key required.");
+            const data = new Uint8Array(await file.arrayBuffer());
+            let offset = 0, results = [], prevP = new Uint8Array(256).fill(0x13);
+
+            logger("OP: START_DECRYPT_PIPELINE");
+            try {
+                while(offset < data.length) {
+                    const block = data.slice(offset, offset + 512); // RSA 4096 output is 512 bytes
+                    const decrypted = new Uint8Array(await window.crypto.subtle.decrypt({name: "RSA-OAEP"}, kP.privateKey, block));
+                    
+                    // Inverse Hilbert
+                    let mingled = applyHilbert(decrypted, false);
+                    
+                    // Linear XOR Restoration
+                    let chunk = new Uint8Array(256);
+                    for(let i=0; i<256; i++) {
+                        chunk[i] = mingled[i] ^ prevP[i];
+                    }
+                    results.push(chunk);
+                    
+                    prevP.set(block.slice(0, 256));
+                    offset += 512;
+                    if(Math.floor(offset/512) % 100 === 0) {
+                        logger(`PULSE: Sector ${Math.floor(offset/512)} restored.`);
+                        await new Promise(r => setTimeout(r, 1));
+                    }
+                }
+                saveAs(new Blob(results), "restored_precision.txt");
+                logger("IO: Decryption Complete.");
+            } catch(e) { logger("CRITICAL: Matrix Desynchronization."); }
+        }
+
+        function saveAs(blob, name) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob); a.download = name; a.click();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+    "project": "RSA 4096 FOREVER",
+    "version": "1.0.0",
+    "modules": [
+      { "id": "prometheus", "name": "The Prometheus Protocol", "path": "RSA4096Forever.html" },
+      { "id": "analyzer", "name": "Quantum Analyzer", "path": "RSA4096ForeverAnalysis.html" }
+    ]
+  }
